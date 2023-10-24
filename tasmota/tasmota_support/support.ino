@@ -1337,6 +1337,13 @@ int ResponseAppendTime(void)
   return ResponseAppendTimeFormat(Settings->flag2.time_format);
 }
 
+char* ResponseAppendPowerState(void){
+  char stopic[TOPSZ];
+  char scommand[33];
+
+  return GetPowerDevice(scommand, 1, sizeof(scommand), Settings->flag2.device_index_enable);
+}
+
 int ResponseAppendTHD(float f_temperature, float f_humidity)
 {
   float dewpoint = CalcTempHumToDew(f_temperature, f_humidity);

@@ -862,6 +862,7 @@ void EnergyMqttShow(void) {
   TasmotaGlobal.tele_period = 2;
   ResponseClear();
   ResponseAppendTime();
+  ResponseAppendPowerState();
   EnergyShow(true);
   TasmotaGlobal.tele_period = tele_period_save;
   ResponseJsonEnd();
