@@ -861,8 +861,6 @@ void EnergyMqttShow(void) {
   int tele_period_save = TasmotaGlobal.tele_period;
   TasmotaGlobal.tele_period = 2;
   ResponseClear();
-  ResponseAppendTime();
-  ResponseAppendPowerState();
   EnergyShow(true);
   TasmotaGlobal.tele_period = tele_period_save;
   ResponseJsonEnd();
@@ -1516,6 +1514,9 @@ void EnergyShow(bool json) {
   if (json) {
     bool show_energy_period = (0 == TasmotaGlobal.tele_period);
 
+    //TODO: Add PowerState 
+    ResponseAppendPowerState();
+    
     ResponseAppend_P(PSTR(",\"" D_RSLT_ENERGY "\":{\"" D_JSON_TOTAL_START_TIME "\":\"%s\",\"" D_JSON_TOTAL "\":%s"),
       GetDT(Energy->Settings.energy_kWhtotal_time).c_str(),
       EnergyFmt(Energy->total, Settings->flag2.energy_resolution, 2));

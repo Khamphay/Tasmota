@@ -16,7 +16,6 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 #define XDRV_02                    2
 
 #define USE_MQTT_NEW_PUBSUBCLIENT
@@ -847,6 +846,10 @@ void MqttPublishPowerState(uint32_t device) {
     GetPowerDevice(scommand, device, sizeof(scommand), Settings->flag.device_index_enable);           // SetOption26 - Switch between POWER or POWER1
     GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, (Settings->flag.mqtt_response) ? scommand : S_RSLT_RESULT);  // SetOption4 - Switch between MQTT RESULT or COMMAND
     Response_P(S_JSON_COMMAND_SVALUE, scommand, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
+    
+    //TODO: Add this line to show power state when POWER is ON or OFF and send to MQTT stat/%topic%/RESULT
+    ResponseAppendPowerState();
+   
     MqttPublish(stopic);
 
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response

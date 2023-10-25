@@ -1200,6 +1200,7 @@ void EnergySnsInit(void)
   }
 }
 
+//TODO: Change this function to show PowerState when sending Energy data to MQTT to topic tele/%topic%/SENSOR (Line: 1283)
 void EnergyShow(bool json) {
   bool voltage_common = (Settings->flag6.no_voltage_common) ? false : Energy->voltage_common;
   bool frequency_common = (Settings->flag6.no_voltage_common) ? false : Energy->frequency_common;
@@ -1279,6 +1280,8 @@ void EnergyShow(bool json) {
 
   if (json) {
     bool show_energy_period = (0 == TasmotaGlobal.tele_period);
+    //TODO: Add PowerState 
+    ResponseAppendPowerState();
 
     ResponseAppend_P(PSTR(",\"" D_RSLT_ENERGY "\":{\"" D_JSON_TOTAL_START_TIME "\":\"%s\",\"" D_JSON_TOTAL "\":%s"),
       GetDT(Settings->energy_kWhtotal_time).c_str(),

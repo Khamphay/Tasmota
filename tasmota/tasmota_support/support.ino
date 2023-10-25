@@ -1303,6 +1303,7 @@ int ResponseTime_P(const char* format, ...)    // Content send snprintf_P char d
 #endif
 }
 
+//TODO: This function is cancat any mqtt data playload
 int ResponseAppend_P(const char* format, ...)  // Content send snprintf_P char data
 {
   // This uses char strings. Be aware of sending %% if % is needed
@@ -1337,11 +1338,13 @@ int ResponseAppendTime(void)
   return ResponseAppendTimeFormat(Settings->flag2.time_format);
 }
 
-char* ResponseAppendPowerState(void){
-  char stopic[TOPSZ];
-  char scommand[33];
-
-  return GetPowerDevice(scommand, 1, sizeof(scommand), Settings->flag2.device_index_enable);
+int ResponseAppendPowerState(void){
+ for (uint32_t i = 0; i < MAX_SWITCHES_SET; i++) {
+    if (SwitchUsed(i)) {
+      ResponseAppend_P(PSTR(",\"%s\":\"%s\""), GetSwitchText(i).c_str(), GetStateText(SwitchState(i)));
+    }
+  }
+  return 0;
 }
 
 int ResponseAppendTHD(float f_temperature, float f_humidity)
