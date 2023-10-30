@@ -847,10 +847,11 @@ void MqttPublishPowerState(uint32_t device) {
     GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, (Settings->flag.mqtt_response) ? scommand : S_RSLT_RESULT);  // SetOption4 - Switch between MQTT RESULT or COMMAND
     Response_P(S_JSON_COMMAND_SVALUE, scommand, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
     
-    //TODO: Add this line to show power state when POWER is ON or OFF and send to MQTT stat/%topic%/RESULT
-    ResponseAppendPowerState();
-   
     MqttPublish(stopic);
+    
+    //TODO: Add this line to show power state when POWER is ON or OFF and send to MQTT stat/%topic%/RESULT
+    //Code Here
+    //END
 
     if (!Settings->flag4.only_json_message) {  // SetOption90 - Disable non-json MQTT response
       GetTopic_P(stopic, STAT, TasmotaGlobal.mqtt_topic, scommand);

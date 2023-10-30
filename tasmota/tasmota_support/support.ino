@@ -1339,10 +1339,11 @@ int ResponseAppendTime(void)
 }
 
 int ResponseAppendPowerState(void){
- for (uint32_t i = 0; i < MAX_SWITCHES_SET; i++) {
-    if (SwitchUsed(i)) {
-      ResponseAppend_P(PSTR(",\"%s\":\"%s\""), GetSwitchText(i).c_str(), GetStateText(SwitchState(i)));
-    }
+  //TODO: Append power state to response of mqtt
+  char scommand[33];
+  for (uint32_t device = 1; device <= TasmotaGlobal.devices_present; device++) {
+    GetPowerDevice(scommand, device, sizeof(scommand), Settings->flag.device_index_enable); 
+    ResponseAppend_P(PSTR(",\"%s\":\"%s\""), D_RSLT_POWER, GetStateText(bitRead(TasmotaGlobal.power, device -1)));
   }
   return 0;
 }
