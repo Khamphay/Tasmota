@@ -25,20 +25,6 @@
 #include "driver/gpio.h"
 #include "soc/soc_caps.h"
 
-#include "AudioFileSourcePROGMEM.h"
-#include "AudioFileSourceID3.h"
-#include "AudioGeneratorMP3.h"
-
-#include <ESP8266SAM.h>
-#include "AudioFileSourceFS.h"
-#include "AudioGeneratorTalkie.h"
-#include "AudioFileSourceICYStream.h"
-#include "AudioFileSourceBuffer.h"
-#include "AudioGeneratorAAC.h"
-
-#include <layer3.h>
-#include <types.h>
-
 /*********************************************************************************************\
  * Driver Settings in memory
 \*********************************************************************************************/
@@ -67,10 +53,11 @@ enum : int8_t {
 };
 
 #define I2S_SLOTS   2
+#define AUDIO_SETTINGS_VERSION  1
 
 typedef struct{
   struct{
-    uint8_t   version = 0;    // B00
+    uint8_t   version = AUDIO_SETTINGS_VERSION;    // B00
 
     // runtime options, will be saved but ignored on setting read
     bool      duplex = 0;           // B01 - depends on GPIO setting and SOC caps, DIN and DOUT on same port in GPIO means -> try to use duplex if possible
@@ -81,7 +68,8 @@ typedef struct{
     bool      mclk_inv[I2S_SLOTS] = {0};  // B05-06 - invert mclk
     bool      bclk_inv[I2S_SLOTS] = {0};  // B07-08 - invert bclk
     bool      ws_inv[I2S_SLOTS] = {0};    // B09-0A - invert ws
-    uint8_t   spare[5];              // B0B-0F
+    uint8_t   mp3_preallocate = 0;    // B0B - will be ignored without PS-RAM
+    uint8_t   spare[4];              // B0C-0F
   } sys;
   struct {
     uint32_t sample_rate = 16000;   // B00-03
@@ -91,25 +79,30 @@ typedef struct{
     uint8_t  slot_config = I2S_SLOT_MSB;// B07 - slot configuration MSB = 0, PCM = 1, PHILIPS = 2
     uint8_t  channels = 2;          // B08 - mono/stereo - 1 is added for both
     bool     apll = 1;              // B09 - will be ignored on unsupported SOC's
-    // device specific
-    uint8_t  mp3_preallocate = 0;   // B0A - preallocate MP3 buffer for mp3 playing
-    uint8_t  codec = 0;             // B0B - S3 box only, unused for now
-    uint8_t  spare[4];              // B0C-0F
+    uint8_t  spare[6];              // B0A-0F
   } tx;
   struct {
     uint32_t sample_rate = 16000;  // B00-03
-    uint8_t  gain = 30;            // B04
-    uint8_t  mode = I2S_MODE_PDM;  // B05 - I2S mode standard, PDM, TDM, DAC
-    uint8_t  slot_mask = I2S_SLOT_NOCHANGE;// B06 - slot mask 
-    uint8_t  slot_config = I2S_SLOT_MSB;// B07 - slot configuration MSB = 0, PCM = 1, PHILIPS = 2
-    uint8_t  channels = 1;         // B08 - mono/stereo - 1 is added for both
-    bool     apll = 1;              // B09 - will be ignored on unsupported SOC's
-    // device specific
-    uint8_t  codec = 0;             // B0A - S3 box only, unused for now
-    uint8_t  mp3_preallocate = 0;   // B0B - will be ignored without PS-RAM
-    uint8_t  spare[4];              // B0C-0F
+    uint16_t gain = 30 * 16;       // B04-05 - in Q12.4
+    uint8_t  mode = I2S_MODE_PDM;  // B06 - I2S mode standard, PDM, TDM, DAC
+    uint8_t  slot_mask = I2S_SLOT_NOCHANGE;// B07 - slot mask 
+    uint8_t  slot_config = I2S_SLOT_MSB;// B08 - slot configuration MSB = 0, PCM = 1, PHILIPS = 2
+    uint8_t  channels = 1;         // B09 - mono/stereo - 1 is added for both
+    // filters
+    uint16_t dc_filter_alpha = 0b0111111011111111;  // B0A-B0B - DC_block filter = (1-2^(-7)) Q32:1.31, or `0` if disabled
+    // low pass filter
+    // See: https://en.wikipedia.org/wiki/Low-pass_filter#Simple_infinite_impulse_response_filter
+    // For 3000Hz low pass filter, RC = 0.0000530786
+    // dt = 1/16000 = 0.0000625
+    // alpha = dt / (RC + dt) = 0.540757545
+    // alpha = (b) 0.100010100110111 = 0x4537
+    uint16_t lowpass_alpha = 0b0100010100110111;    // B0C-B0D - lowpass filter = 3000Hz for 16000Hz sample rate
+    bool     apll = 1;              // B0E - will be ignored on unsupported SOC's
+    uint8_t  spare[1];              // B0F
   } rx;
 } tI2SSettings;
+
+static_assert(sizeof(tI2SSettings) == 48, "tI2SSettings Size is not correct");
 
 typedef union {
   uint8_t data;
@@ -127,41 +120,8 @@ struct AUDIO_I2S_t {
   tI2SSettings *Settings;
 
   i2s_chan_handle_t rx_handle = nullptr;
-
-  AudioGeneratorMP3 *mp3 = nullptr;
-  AudioFileSourceFS *file = nullptr;
-
   TasmotaI2S *out = nullptr;        // instance used for I2S output, or `nullptr` if none
   TasmotaI2S *in = nullptr;         // instance used for I2S input, or `nullptr` if none (it can be the same as `out` in case of full duplex)
-
-  AudioFileSourceID3 *id3 = nullptr;
-  AudioGeneratorMP3 *decoder = NULL;
-  void *mp3ram = NULL;
-
-  TaskHandle_t mp3_task_handle;
-  TaskHandle_t mic_task_handle;
-
-  char mic_path[32];
-  uint8_t mic_stop;
-  int8_t mic_error;
-  bool use_stream = false;
-
-
-// SHINE
-  uint32_t recdur;
-  uint8_t  stream_active;
-  uint8_t  stream_enable;
-  WiFiClient client;
-  ESP8266WebServer *MP3Server;
-
-// I2S_BRIDGE
-  BRIDGE_MODE bridge_mode;
-  WiFiUDP i2s_bridge_udp;
-  WiFiUDP i2s_bridgec_udp;
-  IPAddress i2s_bridge_ip;
-  TaskHandle_t i2s_bridge_h;
-  int8_t ptt_pin = -1;
-
 } audio_i2s;
 
 #endif // USE_I2S_AUDIO
